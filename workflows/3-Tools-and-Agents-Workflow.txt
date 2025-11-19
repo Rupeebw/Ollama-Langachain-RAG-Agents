@@ -1,0 +1,688 @@
+================================================================================
+           TOOLS & AGENTS WITH OLLAMA & LANGCHAIN - ASCII WORKFLOW
+================================================================================
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         WHAT ARE AGENTS?                                     ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+    Traditional LLM                           Agent-Based LLM
+    ───────────────                          ─────────────────
+
+    ┌─────────────┐                          ┌─────────────┐
+    │   Question  │                          │   Question  │
+    └──────┬──────┘                          └──────┬──────┘
+           │                                         │
+           ▼                                         ▼
+    ┌─────────────┐                          ┌─────────────────┐
+    │     LLM     │                          │  Agent (LLM)    │
+    │  (Static    │                          │  Decides which  │
+    │  Knowledge) │                          │  tool(s) to use │
+    └──────┬──────┘                          └────────┬────────┘
+           │                                          │
+           ▼                                          ▼
+    ┌─────────────┐                          ┌─────────────────┐
+    │   Answer    │                          │  Execute Tools  │
+    │  (Limited)  │                          │  - Search Web   │
+    └─────────────┘                          │  - Query Wiki   │
+                                             │  - Call APIs    │
+                                             └────────┬────────┘
+                                                      │
+                                                      ▼
+                                             ┌─────────────────┐
+                                             │  Synthesize     │
+                                             │  Final Answer   │
+                                             │  (Comprehensive)│
+                                             └─────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         AGENT ARCHITECTURE                                   ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+    ┌──────────────────────────────────────────────────────────────┐
+    │                     AGENT COMPONENTS                         │
+    └──────────────────────────────────────────────────────────────┘
+
+         ┌─────────────────────────────────────────────┐
+         │           1. USER QUERY                     │
+         │  "How is Ollama used for running LLM?"      │
+         └────────────────┬────────────────────────────┘
+                          │
+                          ▼
+         ┌─────────────────────────────────────────────┐
+         │           2. AGENT (LLM Brain)              │
+         │  ┌───────────────────────────────────────┐  │
+         │  │ • Analyze question                    │  │
+         │  │ • Determine needed information        │  │
+         │  │ • Select appropriate tool(s)          │  │
+         │  │ • Plan execution strategy             │  │
+         │  └───────────────────────────────────────┘  │
+         └────────────────┬────────────────────────────┘
+                          │
+                          ▼
+         ┌─────────────────────────────────────────────┐
+         │           3. TOOL SELECTION                 │
+         │  ┌───────────────────────────────────────┐  │
+         │  │ Available Tools:                      │  │
+         │  │ [✓] DuckDuckGo Search                 │  │
+         │  │ [✓] Wikipedia Query                   │  │
+         │  │ [ ] Calculator (if added)             │  │
+         │  │ [ ] Custom API (if added)             │  │
+         │  └───────────────────────────────────────┘  │
+         └────────────────┬────────────────────────────┘
+                          │
+                          ▼
+         ┌─────────────────────────────────────────────┐
+         │           4. TOOL EXECUTION                 │
+         │  Execute selected tool(s) with parameters   │
+         └────────────────┬────────────────────────────┘
+                          │
+                          ▼
+         ┌─────────────────────────────────────────────┐
+         │           5. AGENT SCRATCHPAD               │
+         │  Temporary memory of:                       │
+         │  • Tools called                             │
+         │  • Results received                         │
+         │  • Reasoning steps                          │
+         └────────────────┬────────────────────────────┘
+                          │
+                          ▼
+         ┌─────────────────────────────────────────────┐
+         │           6. DECISION LOOP                  │
+         │  Need more info? → Call another tool        │
+         │  Have enough info? → Generate final answer  │
+         └────────────────┬────────────────────────────┘
+                          │
+                          ▼
+         ┌─────────────────────────────────────────────┐
+         │           7. FINAL ANSWER                   │
+         │  Synthesize all information into response   │
+         └─────────────────────────────────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    BUILDING AN AGENT - STEP BY STEP                          ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+STEP 1: INSTALL DEPENDENCIES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ┌─────────────────────────────────┐
+    │ pip install langchain           │
+    │ pip install langchain-core      │
+    │ pip install langchain-ollama    │
+    │ pip install langchain_community │
+    │ pip install ddgs                │
+    │ pip install wikipedia           │
+    └─────────────────────────────────┘
+
+
+STEP 2: IMPORT COMPONENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ┌─────────────────────────────────────────────┐
+    │ from langchain_community.tools import       │
+    │   DuckDuckGoSearchResults                   │
+    │ from langchain.tools import                 │
+    │   WikipediaQueryRun                         │
+    │ from langchain_community.utilities import   │
+    │   WikipediaAPIWrapper                       │
+    │ from langchain.agents import                │
+    │   AgentExecutor,                            │
+    │   create_tool_calling_agent                 │
+    │ from langchain_core.prompts import          │
+    │   ChatPromptTemplate                        │
+    │ from langchain_ollama import ChatOllama     │
+    └─────────────────────────────────────────────┘
+
+
+STEP 3: CREATE PROMPT TEMPLATE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ┌─────────────────────────────────────────────┐
+    │ prompt = ChatPromptTemplate.from_messages(  │
+    │   [                                         │
+    │     ("system", "You are a helpful           │
+    │      assistant. Use tools to find info"),   │
+    │     ("human", "{input}"),                   │
+    │     ("placeholder", "{agent_scratchpad}")   │
+    │   ]                                         │
+    │ )                                           │
+    └─────────────────────────────────────────────┘
+
+    Key Components:
+    • system: Defines agent behavior
+    • human: User's question ({input} placeholder)
+    • agent_scratchpad: Stores tool calls & results
+
+
+STEP 4: INITIALIZE LLM
+━━━━━━━━━━━━━━━━━━━━━━━
+    ┌─────────────────────────────────┐
+    │ llm = ChatOllama(               │
+    │   model="llama3.1:latest",     │
+    │   temperature=0                │
+    │ )                              │
+    └─────────────────────────────────┘
+
+    Why temperature=0?
+    → Deterministic, consistent decisions
+    → Better for tool selection
+
+
+STEP 5: CREATE TOOLS
+━━━━━━━━━━━━━━━━━━━━━
+    ┌──────────────────────────────────────────┐
+    │ Tool 1: DuckDuckGo Search                │
+    │ ┌──────────────────────────────────────┐ │
+    │ │ search = DuckDuckGoSearchResults()   │ │
+    │ │                                      │ │
+    │ │ Capabilities:                        │ │
+    │ │ • Web search                         │ │
+    │ │ • Recent information                 │ │
+    │ │ • Multiple sources                   │ │
+    │ └──────────────────────────────────────┘ │
+    └──────────────────────────────────────────┘
+
+    ┌──────────────────────────────────────────┐
+    │ Tool 2: Wikipedia                        │
+    │ ┌──────────────────────────────────────┐ │
+    │ │ wikipedia = WikipediaQueryRun(       │ │
+    │ │   api_wrapper=WikipediaAPIWrapper()  │ │
+    │ │ )                                    │ │
+    │ │                                      │ │
+    │ │ Capabilities:                        │ │
+    │ │ • Encyclopedia articles              │ │
+    │ │ • Detailed information               │ │
+    │ │ • Structured content                 │ │
+    │ └──────────────────────────────────────┘ │
+    └──────────────────────────────────────────┘
+
+    ┌──────────────────────────────────────────┐
+    │ Combine Tools                            │
+    │ ┌──────────────────────────────────────┐ │
+    │ │ tools = [search, wikipedia]          │ │
+    │ └──────────────────────────────────────┘ │
+    └──────────────────────────────────────────┘
+
+
+STEP 6: CREATE AGENT
+━━━━━━━━━━━━━━━━━━━━
+    ┌─────────────────────────────────────────┐
+    │ agent = create_tool_calling_agent(      │
+    │   llm,                                  │
+    │   tools,                                │
+    │   prompt                                │
+    │ )                                       │
+    └─────────────────────────────────────────┘
+
+    What this does:
+    • Binds tools to LLM
+    • Configures tool calling format
+    • Sets up reasoning loop
+
+
+STEP 7: CREATE AGENT EXECUTOR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ┌─────────────────────────────────────────┐
+    │ agent_executor = AgentExecutor(         │
+    │   agent=agent,                          │
+    │   tools=tools,                          │
+    │   verbose=True                          │
+    │ )                                       │
+    └─────────────────────────────────────────┘
+
+    AgentExecutor:
+    • Orchestrates agent execution
+    • Handles tool calling
+    • Manages iteration loop
+    • verbose=True → Shows reasoning
+
+
+STEP 8: RUN QUERY
+━━━━━━━━━━━━━━━━━━
+    ┌─────────────────────────────────────────┐
+    │ answer = agent_executor.invoke({        │
+    │   "input": "How is Ollama used for      │
+    │            running LLM locally"         │
+    │ })                                      │
+    └─────────────────────────────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    AGENT EXECUTION FLOW (DETAILED)                           ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+EXAMPLE 1: "How is Ollama used for running LLM locally"
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    ┌────────────────────────────────────────────────────────┐
+    │ ITERATION 1                                            │
+    └────────────────────────────────────────────────────────┘
+
+    Step 1: Analyze Query
+    ┌────────────────────────────────────────┐
+    │ Agent thinks:                          │
+    │ "User wants to know about Ollama       │
+    │  and running LLMs locally.             │
+    │  I should search for current info."    │
+    └────────────────────────────────────────┘
+              │
+              ▼
+    Step 2: Select Tool
+    ┌────────────────────────────────────────┐
+    │ Tool Choice: DuckDuckGo Search         │
+    │ Query: "Ollama LLM local run"          │
+    └────────────────────────────────────────┘
+              │
+              ▼
+    Step 3: Execute Tool
+    ┌────────────────────────────────────────────────────┐
+    │ DuckDuckGoSearchResults.run(                       │
+    │   query="Ollama LLM local run"                     │
+    │ )                                                  │
+    │                                                    │
+    │ Returns:                                           │
+    │ ┌────────────────────────────────────────────────┐ │
+    │ │ snippet: "Ollama allows you to run LLMs..."   │ │
+    │ │ link: https://blog.cordatus.ai/...            │ │
+    │ │                                               │ │
+    │ │ snippet: "Guide to running LLM locally..."    │ │
+    │ │ link: https://www.devturtleblog.com/...       │ │
+    │ │                                               │ │
+    │ │ [+ more results]                              │ │
+    │ └────────────────────────────────────────────────┘ │
+    └────────────────────────────────────────────────────┘
+              │
+              ▼
+    Step 4: Agent Scratchpad Updated
+    ┌────────────────────────────────────────┐
+    │ Memory:                                │
+    │ • Called: duckduckgo_search            │
+    │ • Query: "Ollama LLM local run"        │
+    │ • Results: [4 web snippets]            │
+    └────────────────────────────────────────┘
+              │
+              ▼
+    Step 5: Decision
+    ┌────────────────────────────────────────┐
+    │ Agent thinks:                          │
+    │ "I have sufficient information         │
+    │  from the search results.              │
+    │  I can now formulate an answer."       │
+    └────────────────────────────────────────┘
+              │
+              ▼
+    Step 6: Generate Final Answer
+    ┌────────────────────────────────────────────────────┐
+    │ "Ollama is used for running Large Language        │
+    │  Models (LLMs) locally by allowing users to       │
+    │  download and run powerful open-source LLMs       │
+    │  directly on their local computer without         │
+    │  depending on paid services. It provides a        │
+    │  simple way to manage and operate open-source     │
+    │  LLMs from your local hardware..."                │
+    │                                                    │
+    │ References:                                        │
+    │ - https://solutionslounge.com/blog/...            │
+    │ - https://www.devturtleblog.com/...               │
+    └────────────────────────────────────────────────────┘
+
+
+EXAMPLE 2: "Who is Yann LeCun"
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    ┌────────────────────────────────────────────────────────┐
+    │ ITERATION 1                                            │
+    └────────────────────────────────────────────────────────┘
+
+    Step 1: Analyze Query
+    ┌────────────────────────────────────────┐
+    │ Agent thinks:                          │
+    │ "User wants biographical info          │
+    │  about a person. Wikipedia would       │
+    │  be the best source."                  │
+    └────────────────────────────────────────┘
+              │
+              ▼
+    Step 2: Select Tool
+    ┌────────────────────────────────────────┐
+    │ Tool Choice: Wikipedia                 │
+    │ Query: "Yann LeCun"                    │
+    └────────────────────────────────────────┘
+              │
+              ▼
+    Step 3: Execute Tool
+    ┌────────────────────────────────────────────────────┐
+    │ WikipediaQueryRun.run(query="Yann LeCun")          │
+    │                                                    │
+    │ Returns:                                           │
+    │ ┌────────────────────────────────────────────────┐ │
+    │ │ Page: Yann LeCun                              │ │
+    │ │                                               │ │
+    │ │ Summary: Yann André Le Cun is a French-      │ │
+    │ │ American computer scientist working           │ │
+    │ │ primarily in the fields of machine            │ │
+    │ │ learning, computer vision, mobile             │ │
+    │ │ robotics and computational neuroscience.      │ │
+    │ │ He is the Jacob T. Schwartz Professor...      │ │
+    │ │                                               │ │
+    │ │ [Full Wikipedia article excerpt]              │ │
+    │ └────────────────────────────────────────────────┘ │
+    └────────────────────────────────────────────────────┘
+              │
+              ▼
+    Step 4: Generate Final Answer
+    ┌────────────────────────────────────────────────────┐
+    │ "Yann LeCun is a French-American computer         │
+    │  scientist working primarily in machine learning, │
+    │  computer vision, mobile robotics, and            │
+    │  computational neuroscience. He is the Jacob T.   │
+    │  Schwartz Professor of Computer Science at NYU    │
+    │  and Chief AI Scientist at Meta. He received the  │
+    │  Turing Award in 2018 with Yoshua Bengio and      │
+    │  Geoffrey Hinton for their work on deep           │
+    │  learning."                                       │
+    └────────────────────────────────────────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    AGENT DECISION MAKING PROCESS                             ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+    ┌─────────────────────────────────────────────────────────┐
+    │              HOW AGENT CHOOSES TOOLS                    │
+    └─────────────────────────────────────────────────────────┘
+
+         User Query
+              │
+              ▼
+    ┌─────────────────────┐
+    │ Question Analysis   │
+    │                     │
+    │ What type?          │────┐
+    │ • Factual?          │    │
+    │ • Current events?   │    │
+    │ • Biography?        │    │
+    │ • Technical?        │    │
+    └─────────────────────┘    │
+                               │
+         ┌─────────────────────┘
+         │
+         ▼
+    ┌─────────────────────────────────────────┐
+    │ Tool Selection Logic:                   │
+    │                                         │
+    │ IF biography/person → Wikipedia         │
+    │ IF current/recent → DuckDuckGo          │
+    │ IF technical how-to → Both tools        │
+    │ IF calculation → Calculator (if added)  │
+    │ IF code → Code interpreter (if added)   │
+    └─────────────────────────────────────────┘
+
+
+    ┌─────────────────────────────────────────────────────────┐
+    │              MULTI-STEP REASONING                       │
+    └─────────────────────────────────────────────────────────┘
+
+    Complex Query: "Compare Yann LeCun and Geoffrey Hinton's
+                    contributions to deep learning"
+
+    Agent's Thought Process:
+    ┌────────────────────────────────────┐
+    │ Step 1: Need info about Yann LeCun │
+    │   → Call Wikipedia("Yann LeCun")   │
+    └──────────┬─────────────────────────┘
+               │
+               ▼
+    ┌────────────────────────────────────┐
+    │ Step 2: Need info about Hinton     │
+    │   → Call Wikipedia("Hinton")       │
+    └──────────┬─────────────────────────┘
+               │
+               ▼
+    ┌────────────────────────────────────┐
+    │ Step 3: Compare contributions      │
+    │   → Synthesize from both results   │
+    └──────────┬─────────────────────────┘
+               │
+               ▼
+    ┌────────────────────────────────────┐
+    │ Generate comprehensive comparison  │
+    └────────────────────────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         TOOL ANATOMY                                         ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ TOOL STRUCTURE                                                             │
+│                                                                            │
+│ Every LangChain tool has:                                                  │
+│                                                                            │
+│ 1. NAME                                                                    │
+│    • Identifies the tool                                                   │
+│    • Used by agent for selection                                           │
+│    Example: "duckduckgo_search", "wikipedia"                               │
+│                                                                            │
+│ 2. DESCRIPTION                                                             │
+│    • Explains what the tool does                                           │
+│    • Helps agent decide when to use it                                     │
+│    Example: "Search the web for recent information"                        │
+│                                                                            │
+│ 3. INPUT SCHEMA                                                            │
+│    • Defines expected parameters                                           │
+│    • Validates input                                                       │
+│    Example: {"query": "string"}                                            │
+│                                                                            │
+│ 4. FUNCTION/METHOD                                                         │
+│    • The actual code that runs                                             │
+│    • Returns results to agent                                              │
+│    Example: def run(query: str) -> str                                     │
+└────────────────────────────────────────────────────────────────────────────┘
+
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ CUSTOM TOOL EXAMPLE                                                        │
+│                                                                            │
+│ from langchain.tools import BaseTool                                       │
+│                                                                            │
+│ class CalculatorTool(BaseTool):                                            │
+│     name = "calculator"                                                    │
+│     description = "Performs mathematical calculations"                     │
+│                                                                            │
+│     def _run(self, expression: str) -> str:                                │
+│         try:                                                               │
+│             result = eval(expression)                                      │
+│             return f"The result is {result}"                               │
+│         except:                                                            │
+│             return "Invalid expression"                                    │
+│                                                                            │
+│ # Usage:                                                                   │
+│ calculator = CalculatorTool()                                              │
+│ tools = [search, wikipedia, calculator]                                    │
+└────────────────────────────────────────────────────────────────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    AGENT EXECUTOR WITH VERBOSE OUTPUT                        ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+When verbose=True, you see:
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ > Entering new AgentExecutor chain...                                      │
+│                                                                            │
+│ [Agent's internal reasoning]                                               │
+│ Invoking: `duckduckgo_results_json` with `{'query': 'Ollama LLM'}`        │
+│                                                                            │
+│ [Tool output]                                                              │
+│ snippet: "Ollama allows you to run..."                                     │
+│ link: https://example.com                                                  │
+│                                                                            │
+│ [Agent's synthesis]                                                        │
+│ Ollama is used for running Large Language Models locally...                │
+│                                                                            │
+│ > Finished chain.                                                          │
+└────────────────────────────────────────────────────────────────────────────┘
+
+This shows:
+✓ Which tools were called
+✓ What parameters were used
+✓ What results were returned
+✓ How the final answer was synthesized
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         KEY CONCEPTS                                         ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ 1. TOOL CALLING vs FUNCTION CALLING                                        │
+│                                                                            │
+│ Tool Calling (LangChain):                                                  │
+│ • Agent decides which tool to use                                          │
+│ • Can chain multiple tool calls                                            │
+│ • Flexible, autonomous                                                     │
+│                                                                            │
+│ Function Calling (OpenAI):                                                 │
+│ • Similar concept, different implementation                                │
+│ • Model generates function call syntax                                     │
+│ • Used for structured output                                               │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ 2. AGENT SCRATCHPAD                                                        │
+│                                                                            │
+│ Temporary memory containing:                                               │
+│ • Previous tool calls in this session                                      │
+│ • Results from those calls                                                 │
+│ • Reasoning steps                                                          │
+│                                                                            │
+│ Cleared after each query                                                   │
+│ Allows multi-step reasoning                                                │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ 3. AGENT TYPES                                                             │
+│                                                                            │
+│ create_tool_calling_agent:                                                 │
+│ • Modern approach                                                          │
+│ • Uses native tool calling                                                 │
+│ • Better performance                                                       │
+│                                                                            │
+│ Other types (legacy):                                                      │
+│ • Zero-shot ReAct                                                          │
+│ • Conversational                                                           │
+│ • Self-ask with search                                                     │
+└────────────────────────────────────────────────────────────────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    COMPLETE AGENT WORKFLOW                                   ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+    ┌───────────────────────────────────────────────────────────────┐
+    │                    SETUP PHASE                                │
+    └───────────────────────────────────────────────────────────────┘
+
+    1. Install Dependencies
+         ↓
+    2. Import Components
+         ↓
+    3. Create Prompt Template
+         ↓
+    4. Initialize LLM (ChatOllama)
+         ↓
+    5. Create Tools (Search, Wikipedia, etc.)
+         ↓
+    6. Create Agent (bind LLM + Tools + Prompt)
+         ↓
+    7. Create AgentExecutor
+         ↓
+
+    ┌───────────────────────────────────────────────────────────────┐
+    │                    RUNTIME PHASE                              │
+    └───────────────────────────────────────────────────────────────┘
+
+    User Query
+         ↓
+    Agent Analyzes Query
+         ↓
+    ┌────────────────────────────────────┐
+    │ Decision Loop:                     │
+    │                                    │
+    │ Need more info?                    │
+    │  YES → Select & Execute Tool       │
+    │        ↓                           │
+    │     Update Scratchpad              │
+    │        ↓                           │
+    │     Repeat Decision                │
+    │                                    │
+    │  NO → Generate Final Answer        │
+    └────────────────────────────────────┘
+         ↓
+    Return Answer to User
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         BENEFITS OF AGENTS                                   ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+    ✓ Dynamic Decision Making
+      → Agent chooses best tool for each query
+
+    ✓ Up-to-date Information
+      → Access to current web data
+
+    ✓ Multi-step Reasoning
+      → Can chain multiple tool calls
+
+    ✓ Extensibility
+      → Easy to add new tools
+
+    ✓ Transparency
+      → Verbose mode shows reasoning
+
+    ✓ Autonomy
+      → Handles complex queries independently
+
+    ✓ Specialized Knowledge
+      → Each tool brings domain expertise
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         USE CASES                                            ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ Research Assistant                                                         │
+│ • Search web for papers                                                    │
+│ • Query Wikipedia for background                                           │
+│ • Synthesize information                                                   │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ Customer Support                                                           │
+│ • Search knowledge base                                                    │
+│ • Query product database                                                   │
+│ • Create support tickets                                                   │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ Data Analysis                                                              │
+│ • Query databases                                                          │
+│ • Perform calculations                                                     │
+│ • Generate reports                                                         │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ Code Assistant                                                             │
+│ • Search documentation                                                     │
+│ • Execute code                                                             │
+│ • Debug issues                                                             │
+└────────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+                              END OF WORKFLOW
+================================================================================

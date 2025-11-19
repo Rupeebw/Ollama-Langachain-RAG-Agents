@@ -1,0 +1,131 @@
+Retrieval-Augmented Generation (RAG) with LangChain
+
+RAG is a powerful technique that combines the capabilities of large language models with external knowledge retrieval. This approach allows AI systems to access up-to-date information beyond their training data, making responses more accurate and contextual.
+
+LangChain RAG Components:
+
+1. Document Loaders
+LangChain provides over 100 document loaders to ingest data from various sources including PDFs, HTML files, databases, APIs, and cloud storage services like S3. These loaders transform raw data into a format suitable for processing.
+
+2. Text Splitters
+Large documents need to be chunked into smaller pieces for efficient retrieval. LangChain offers several splitting strategies:
+- RecursiveCharacterTextSplitter: Splits text recursively by different characters
+- CharacterTextSplitter: Splits on a single character
+- TokenTextSplitter: Splits based on token count
+- MarkdownHeaderTextSplitter: Preserves document structure
+
+3. Embeddings
+Text embeddings convert documents into high-dimensional vectors that capture semantic meaning. LangChain integrates with 25+ embedding providers:
+- OpenAI Embeddings
+- Ollama Embeddings (for local models)
+- Hugging Face Embeddings
+- Cohere Embeddings
+- Google PaLM Embeddings
+
+4. Vector Stores
+Vector databases store and efficiently search through embeddings. LangChain supports 50+ vector stores:
+- Chroma: Lightweight, open-source vector database
+- Pinecone: Cloud-based vector database
+- FAISS: Facebook AI Similarity Search
+- Qdrant: High-performance vector search engine
+- Weaviate: Cloud-native vector database
+
+5. Retrievers
+Retrievers fetch relevant documents based on queries. LangChain offers advanced retrieval methods:
+- Similarity Search: Basic semantic search
+- MMR (Maximum Marginal Relevance): Balances relevance and diversity
+- Parent Document Retriever: Returns larger context from smaller chunks
+- Self-Query Retriever: Parses metadata filters from queries
+- Ensemble Retriever: Combines multiple retrieval algorithms
+- Multi-Query Retriever: Generates multiple query variations
+
+Building a RAG Pipeline:
+
+Step 1: Load documents
+from langchain_community.document_loaders import TextLoader
+loader = TextLoader("document.txt")
+documents = loader.load()
+
+Step 2: Split documents
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+chunks = splitter.split_documents(documents)
+
+Step 3: Create embeddings
+from langchain_ollama import OllamaEmbeddings
+embeddings = OllamaEmbeddings(model="nomic-embed-text")
+
+Step 4: Store in vector database
+from langchain_chroma import Chroma
+vectorstore = Chroma.from_documents(chunks, embeddings)
+
+Step 5: Create retriever
+retriever = vectorstore.as_retriever(search_kwargs={"k": 4})
+
+Step 6: Build RAG chain
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_ollama import ChatOllama
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+
+template = """Answer based on context:
+{context}
+
+Question: {question}
+"""
+
+prompt = ChatPromptTemplate.from_template(template)
+llm = ChatOllama(model="llama3.1:8b")
+
+def format_docs(docs):
+    return "\n\n".join([d.page_content for d in docs])
+
+chain = (
+    {"context": retriever | format_docs, "question": RunnablePassthrough()}
+    | prompt
+    | llm
+    | StrOutputParser()
+)
+
+# Use the chain
+response = chain.invoke("Your question here")
+
+Advanced RAG Techniques:
+
+1. Contextual Compression
+Compress retrieved documents to only include relevant information, reducing token usage and improving response quality.
+
+2. Hybrid Search
+Combine semantic search with keyword-based search (BM25) for better retrieval accuracy.
+
+3. Re-ranking
+Use a re-ranking model to re-order retrieved documents based on relevance to the query.
+
+4. Query Transformation
+Transform user queries into optimized versions for better retrieval:
+- Multi-query: Generate multiple perspectives of the same question
+- Step-back: Create more general queries for broader context
+- RAG-Fusion: Combine and re-rank results from multiple query variations
+
+5. Agentic RAG
+Use LangChain agents to decide when and how to retrieve information, combining multiple tools and data sources dynamically.
+
+Benefits of LangChain for RAG:
+
+- Modular Architecture: Easy to swap components (embeddings, vector stores, retrievers)
+- Extensive Integrations: Works with most popular tools and services
+- Chain Composition: Build complex RAG pipelines with simple syntax
+- Production-Ready: Built-in error handling, retries, and monitoring
+- Cost Optimization: Avoid re-computing embeddings for unchanged content
+- Indexing API: Sync data efficiently without duplicates
+
+Use Cases:
+
+- Question Answering: Build intelligent Q&A systems over proprietary data
+- Document Analysis: Extract insights from large document collections
+- Customer Support: Create context-aware chatbots with company knowledge
+- Research Assistance: Help researchers find relevant information quickly
+- Code Documentation: Build systems that understand and explain codebases
+- Legal Review: Analyze contracts and legal documents efficiently
+
+LangChain's RAG capabilities make it the go-to framework for building production-grade retrieval-augmented generation applications with minimal code and maximum flexibility.
