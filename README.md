@@ -597,35 +597,7 @@ agent_executor = AgentExecutor(
 
 ---
 
-## 🎯 Learning Objectives Checklist
 
-### After Module 1, you should be able to:
-
-- [ ] Install and configure Ollama
-- [ ] Download and run local LLM models
-- [ ] Use both `generate()` and `chat()` methods
-- [ ] Create custom models with system prompts
-- [ ] Understand model parameters (temperature, context size)
-
-### After Module 2, you should be able to:
-
-- [ ] Explain what RAG is and why it's useful
-- [ ] Load and process documents for RAG
-- [ ] Create embeddings and store in vector databases
-- [ ] Build complete RAG chains with LangChain
-- [ ] Query your documents using natural language
-- [ ] Optimize chunk size and retrieval parameters
-
-### After Module 3, you should be able to:
-
-- [ ] Explain how AI agents work
-- [ ] Create tools for agents to use
-- [ ] Build tool-calling agents with LangChain
-- [ ] Understand agent decision-making process
-- [ ] Debug agents using verbose mode
-- [ ] Design multi-step agent workflows
-
----
 
 ## 📚 Additional Resources
 
@@ -725,26 +697,7 @@ After completing all three modules, consider:
 
 ---
 
-## 📅 Suggested Learning Timeline
 
-### Week 1: Foundations
-
-- Day 1-2: Module 1 (Ollama Basics)
-- Day 3-4: Practice and experimentation
-- Day 5-7: Module 2 (RAG Applications)
-
-### Week 2: Advanced Topics
-
-- Day 1-2: Complete RAG exercises
-- Day 3-4: Module 3 (Agents)
-- Day 5-7: Build a personal project
-
-### Week 3: Mastery
-
-- Day 1-3: Combine concepts (RAG + Agents)
-- Day 4-7: Build production-ready application
-
----
 
 ## 🙏 Acknowledgments
 
